@@ -1,0 +1,96 @@
+---
+title: 'Predictive Anaylsit: Weight Lifting Exercises JHU'
+author: "Hongyan Kang"
+date: "March 5, 2017"
+output: html_document
+---
+---
+Reproduceability
+
+An overall pseudo-random number generator seed was set at 824 for all code. In order to reproduce the results below, the same seed should be used.
+Different packages were downloaded and installed, such as caret and randomForest. These should also be installed in order to reproduce the results below (please see code below for ways and syntax to do so).
+
+How the model was built:
+
+Our outcome variable is classe, a factor variable with 5 levels. For this data set, "participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in 5 different fashions:
+- exactly according to the specification (Class A)
+- throwing the elbows to the front (Class B)
+- lifting the dumbbell only halfway (Class C)
+- lowering the dumbbell only halfway (Class D)
+- throwing the hips to the front (Class E)
+
+Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes."
+Prediction evaluations will be based on maximizing the accuracy and minimizing the out-of-sample error. All other available variables after cleaning will be used for prediction.
+Two models will be tested using decision tree and random forest algorithms. The model with the highest accuracy will be chosen as our final model.
+
+```{r}
+#loading the packages and set the seed for reproducing
+library(lattice)
+library(ggplot2)
+library(caret)
+library(randomForest)
+library(rpart) 
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+set.seed(824)
+
+# import the dataset 
+trainUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+Training <- read.csv(url(trainUrl), na.strings = c("NA","#DIV/0!",""))
+Testing <- read.csv(url(testUrl), na.strings = c("NA","#DIV/0!",""))
+
+# Check dimensions for number of variables and number of observations
+dim(Training)
+dim(Testing)
+
+# Delete columns with all missing values
+Trainingset<-Training[,colSums(is.na(Training)) == 0]
+Testingset <-Testing[,colSums(is.na(Testing)) == 0]
+
+# Some variables are irrelevant to our current project: user_name, raw_timestamp_part_1, raw_timestamp_part_,2 cvtd_timestamp, new_window, and  num_window (columns 1 to 7). We can delete these variables.
+
+Trainingset   <-Trainingset[,-c(1:7)]
+Testingset <-Testingset[,-c(1:7)]
+
+# and take a look at our new datasets:
+dim(Trainingset)
+dim(Testingset)
+
+#Partitioning the training data set to allow cross-validation:
+subsamples <- createDataPartition(y=Trainingset$classe, p=0.6, list=FALSE)
+subTraining <- Trainingset[subsamples, ] 
+subTesting <- Trainingset[-subsamples, ]
+dim(subTraining)
+dim(subTesting)
+head(subTraining)
+head(subTesting)
+
+# Using ML algorithms for prediction: Decision Tree
+modFitDT <- rpart(classe ~ ., data=subTraining, method="class")
+fancyRpartPlot(modFitDT)
+
+# now predicting 
+predictionDT1 <- predict(modFitDT, subTesting, type = "class")
+# using confusion matrix to test the in sample error result:
+confusionMatrix(predictionDT1, subTesting$classe)
+
+# using ML algorithms for prediction: random forest
+modFitRF <- randomForest(classe~., data = subTraining)
+predictionRF1 <- predict(modFitRF, subTesting, type = "class")
+
+# using confusion matrix to test the in sample error result:
+confusionMatrix(predictionRF1, subTesting$classe) 
+
+#Decision: the result shows random forest have a higher accuracy. So we decide to chose Random Forest model
+
+# last to use the test dataset to test the out of sample error
+predictionRF2 <- predict(modFitRF, Testingset, type = "class")
+predictionRF2 
+
+```
+
+Discussion: 
+In this analyses, 19622 observations from weight lifting exercise were used to analyze and predict correct body movement from others during the exercise. 60% of the total observations (11776 observations) were used to build a model by random forest method, and the rest of 40% of the observations (7846 observations) were used for model validation (cross-validation). The model statistics showed that the built model had the overall accuracy of 99% for the testing set, which is not overlapping with observations used to built the model. The sensitivity and specificity were over 98% for all classes. Overall, the model is well developed to predict the exercise classes during weight lifting. As for the limitation in this study, the observation data used in the analyses was collected from 6 young health participants in an experiment using Microsoft Kinect. Therefore, under those condition, the model is expected to perform over 90% accuracy; however, with different conditions, such as experiments with elderly people and/or using different device, the model might not perform well as shown in the analysis.
+
